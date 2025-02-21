@@ -1,0 +1,34 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, when
+spark = 
+SparkSession.builder.appName("CourseEnrollmentAnalysis").getOrCreate()
+path = "/content/onlinecouse_enroll.csv"
+df = spark.read.csv(path, header=True, inferSchema=True)
+df.show(5)
+null_check = df.filter(df['courseName'].isNull() | 
+df['enrollments'].isNull())
+null_check.show()
+df.printSchema()
+df = df.withColumn("group",
+when(col("enrollments") < 50, "Low")
+.when(col("enrollments").between(50, 200), "Medium")
+.otherwise("High"))
+enroll_by_course = df.groupBy("courseName", "courseCategory", 
+"instructorName").sum("enrollments") \
+.withColumnRenamed("sum(enrollments)", "total_enrollments")
+sorted_df = enroll_by_course.orderBy("total_enrollments", ascending=False)
+sorted_df.limit(5).show()
+top_course = sorted_df.limit(1)
+top_course.show()
+low_enroll = enroll_by_course.filter(col("total_enrollments") < 50)
+low_enroll.show()
+grouped_by_range = df.groupBy("group").agg({"enrollments": "sum"})
+grouped_by_range.show()
+total_enroll = 
+enroll_by_course.select("total_enrollments").groupBy().sum().collect()[0][0]
+percent_df = enroll_by_course.withColumn("percent",
+(col("total_enrollments") / 
+total_enroll) * 100)
+sorted_by_percent = percent_df.orderBy("percent", ascending=False)
+sorted_by_percent.limit(5).show()
+spark.stop()
